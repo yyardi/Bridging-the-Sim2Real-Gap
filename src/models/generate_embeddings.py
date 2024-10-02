@@ -1,25 +1,36 @@
 import torch
 import numpy as np
 from tqdm import trange
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
 import os
 
-def generate_embeddings(model, sim1_imgs, sim2_imgs, real_imgs, model_output_dim, 
-                       num_samples=1000, batch_size=200, selected_model_name="ResNet18", 
-                       output_dir='embeddings'):
+
+def generate_embeddings(
+    model,
+    sim1_imgs,
+    sim2_imgs,
+    real_imgs,
+    model_output_dim,
+    num_samples=1000,
+    batch_size=200,
+    selected_model_name="ResNet18",
+    output_dir="embeddings",
+):
     # Create the output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
 
     # Define resize transformation for MVP and VIP models
-    resize_transform = transforms.Compose(
-        [
-            transforms.ToPILImage(),  # Convert tensor to PIL image
-            transforms.Resize((224, 224)),  # Resize image to 224x224
-            transforms.ToTensor(),  # Convert PIL image back to tensor
-        ]
-    ) if selected_model_name in ["MVP", "VIP"] else None
+    resize_transform = (
+        transforms.Compose(
+            [
+                transforms.ToPILImage(),  # Convert tensor to PIL image
+                transforms.Resize((224, 224)),  # Resize image to 224x224
+                transforms.ToTensor(),  # Convert PIL image back to tensor
+            ]
+        )
+        if selected_model_name in ["MVP", "VIP"]
+        else None
+    )
 
     # Sample indices for each dataset
     sim1_indices = np.random.choice(sim1_imgs.shape[0], size=num_samples, replace=False)
@@ -43,7 +54,9 @@ def generate_embeddings(model, sim1_imgs, sim2_imgs, real_imgs, model_output_dim
                     .cuda()
                 )
             else:
-                sim_batch = torch.tensor(sim1_imgs[batch_indices]).permute(0, 3, 1, 2).float().cuda()
+                sim_batch = (
+                    torch.tensor(sim1_imgs[batch_indices]).permute(0, 3, 1, 2).float().cuda()
+                )
             sim1_embeddings[i : i + batch_size] = model(sim_batch).cpu()
 
             # Process sim2 images
@@ -55,7 +68,9 @@ def generate_embeddings(model, sim1_imgs, sim2_imgs, real_imgs, model_output_dim
                     .cuda()
                 )
             else:
-                sim_batch = torch.tensor(sim2_imgs[batch_indices]).permute(0, 3, 1, 2).float().cuda()
+                sim_batch = (
+                    torch.tensor(sim2_imgs[batch_indices]).permute(0, 3, 1, 2).float().cuda()
+                )
             sim2_embeddings[i : i + batch_size] = model(sim_batch).cpu()
 
             # Process real images
@@ -67,15 +82,25 @@ def generate_embeddings(model, sim1_imgs, sim2_imgs, real_imgs, model_output_dim
                     .cuda()
                 )
             else:
-                real_batch = torch.tensor(real_imgs[batch_indices]).permute(0, 3, 1, 2).float().cuda()
+                real_batch = (
+                    torch.tensor(real_imgs[batch_indices]).permute(0, 3, 1, 2).float().cuda()
+                )
             real_embeddings[i : i + batch_size] = model(real_batch).cpu()
 
     # Save embeddings to separate files
-    np.save(os.path.join(output_dir, f'{selected_model_name}_sim1_embeddings.npy'), sim1_embeddings.cpu().numpy())
-    np.save(os.path.join(output_dir, f'{selected_model_name}_sim2_embeddings.npy'), sim2_embeddings.cpu().numpy())
-    np.save(os.path.join(output_dir, f'{selected_model_name}_real_embeddings.npy'), real_embeddings.cpu().numpy())
+    np.save(
+        os.path.join(output_dir, f"{selected_model_name}_sim1_embeddings.npy"),
+        sim1_embeddings.cpu().numpy(),
+    )
+    np.save(
+        os.path.join(output_dir, f"{selected_model_name}_sim2_embeddings.npy"),
+        sim2_embeddings.cpu().numpy(),
+    )
+    np.save(
+        os.path.join(output_dir, f"{selected_model_name}_real_embeddings.npy"),
+        real_embeddings.cpu().numpy(),
+    )
 
     print(f"Embeddings saved to {output_dir} with model name: {selected_model_name}")
 
     return sim1_embeddings, sim2_embeddings, real_embeddings
-
