@@ -1,16 +1,7 @@
-from pathlib import Path
-
-from tqdm import trange
-from sklearn.manifold import TSNE
-import zarr
-
-import torch
-import torchvision.transforms as transforms
-import numpy as np
-import matplotlib.pyplot as plt
 from r3m import load_r3m
 import mvp
 from vip import load_vip
+from src.models.dino import DinoV2Encoder
 
 
 def load_vip_model():
@@ -48,4 +39,5 @@ models = {
     "ResNet34": load_resnet34,
     "ResNet50": load_resnet50,
     "MVP": load_mvp,
+    "dinov2": lambda: DinoV2Encoder("dinov2_vits14"),
 }
