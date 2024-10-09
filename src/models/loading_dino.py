@@ -1,6 +1,7 @@
 import torch
 from torchvision import transforms
 
+#  this file can be moved to encoders.py
 
 class DinoV2Encoder(torch.nn.Module):
     def __init__(self, model_name="dinov2_vits14", freeze=True, device="cuda"):

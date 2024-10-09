@@ -1,7 +1,7 @@
 from r3m import load_r3m
 import mvp
 from vip import load_vip
-from src.models.dino import DinoV2Encoder
+from src.models.loading_dino import DinoV2Encoder
 
 
 def load_vip_model():
