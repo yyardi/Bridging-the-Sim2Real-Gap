@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-import numpy as np
 from src.models.loadsplit import load_and_use_existing_split
 
 
@@ -10,11 +9,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-import numpy as np
+
 
 # Debugging helper
 def debug_info(variable, name):
-    print(f"{name} - Type: {type(variable)}, Dtype: {getattr(variable, 'dtype', 'N/A')}, Sample: {variable[:5]}")
+    print(
+        f"{name} - Type: {type(variable)}, Dtype: {getattr(variable, 'dtype', 'N/A')}, Sample: {variable[:5]}"
+    )
 
 
 # Define the Linear Probe model
@@ -27,22 +28,28 @@ class LinearProbe(nn.Module):
         return self.linear(x)
 
 
-def train_domain_probe(file_path, epochs=30, batch_size=200, lr=0.001):
+def train_domain_probe(file_path, epochs=30, batch_size=200, lr=0.001, device="cpu"):
     # Load train and validation splits
     train_data, val_data = load_and_use_existing_split(file_path)
 
     # Convert data to PyTorch tensors
     train_embeddings = torch.tensor(train_data["embeddings"], dtype=torch.float32)
     debug_info(train_embeddings, "train_embeddings")
-    
+
     try:
-        train_labels = torch.tensor(train_data["dataset_flag"], dtype=torch.float32).unsqueeze(1)  # Binary labels
+        train_labels = torch.tensor(
+            train_data["dataset_flag"] == "r", dtype=torch.float32
+        ).unsqueeze(
+            1
+        )  # Binary labels
         debug_info(train_labels, "train_labels")
     except Exception as e:
         print(f"Error in train_labels: {e}")
 
     val_embeddings = torch.tensor(val_data["embeddings"], dtype=torch.float32)
-    val_labels = torch.tensor(val_data["dataset_flag"], dtype=torch.float32).unsqueeze(1)  # Binary labels
+    val_labels = torch.tensor(val_data["dataset_flag"] == "r", dtype=torch.float32).unsqueeze(
+        1
+    )  # Binary labels
 
     # Create TensorDatasets
     train_dataset = TensorDataset(train_embeddings, train_labels)
@@ -101,6 +108,7 @@ def train_domain_probe(file_path, epochs=30, batch_size=200, lr=0.001):
             f"Val Loss: {val_loss/len(val_loader):.4f} | "
             f"Val Accuracy: {val_accuracy * 100:.2f}%"
         )
+
 
 # Example usage:
 # train_domain_probe("path_to_your_npz_file.npz", epochs=30, batch_size=200, lr=0.001)
