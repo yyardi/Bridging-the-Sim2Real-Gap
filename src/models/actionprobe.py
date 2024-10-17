@@ -5,25 +5,17 @@ from torch.utils.data import DataLoader, TensorDataset
 from src.models.loadsplit import load_and_use_existing_split
 
 
-
-# Debugging helper
-def debug_info(variable, name):
-    print(
-        f"{name} - Type: {type(variable)}, Dtype: {getattr(variable, 'dtype', 'N/A')}, Sample: {variable[:5]}"
-    )
-
-
-# Define the Linear Probe model
-class LinearProbe(nn.Module):
-    def __init__(self, input_dim, output_dim=1):
-        super(LinearProbe, self).__init__()
+# Define the Linear Probe model for multi-class classification
+class LinearProbeMultiClass(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super(LinearProbeMultiClass, self).__init__()
         self.linear = nn.Linear(input_dim, output_dim)
 
     def forward(self, x):
         return self.linear(x)
 
 
-def train_domain_probe(file_path, epochs=30, batch_size=200, lr=0.001):
+def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001, num_classes=5):
     # Load train and validation splits
     train_data, val_data = load_and_use_existing_split(file_path)
 
@@ -35,13 +27,9 @@ def train_domain_probe(file_path, epochs=30, batch_size=200, lr=0.001):
     train_embeddings = torch.tensor(train_data["embeddings"], dtype=torch.float32).to(device)
     val_embeddings = torch.tensor(val_data["embeddings"], dtype=torch.float32).to(device)
 
-    # Labels (move them to the correct device)
-    train_labels = torch.tensor(train_data["dataset_flag"] == "r", dtype=torch.float32).unsqueeze(1).to(device)
-    val_labels = torch.tensor(val_data["dataset_flag"] == "r", dtype=torch.float32).unsqueeze(1).to(device)
-
-    # Debugging information
-    debug_info(train_embeddings, "train_embeddings")
-    debug_info(train_labels, "train_labels")
+    # Labels (move them to the correct device; no one-hot encoding)
+    train_labels = torch.tensor(train_data["labels"], dtype=torch.long).to(device)
+    val_labels = torch.tensor(val_data["labels"], dtype=torch.long).to(device)
 
     # Create TensorDatasets and DataLoaders
     train_dataset = TensorDataset(train_embeddings, train_labels)
@@ -51,42 +39,42 @@ def train_domain_probe(file_path, epochs=30, batch_size=200, lr=0.001):
 
     # Define the Linear Probe model
     input_dim = train_embeddings.shape[1]  # Based on embedding size
-    domain_probe = LinearProbe(input_dim).to(device)  # Make sure the model is on the correct device
+    action_probe = LinearProbeMultiClass(input_dim, num_classes).to(device)
 
     # Loss function and optimizer
-    criterion = nn.BCEWithLogitsLoss()  # Binary cross-entropy loss
-    optimizer = optim.Adam(domain_probe.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()  # Cross entropy loss
+    optimizer = optim.Adam(action_probe.parameters(), lr=lr)
 
     # Training loop
     for epoch in range(epochs):
-        domain_probe.train()
+        action_probe.train()
         train_loss = 0.0
 
         # Training phase
         for features, labels in train_loader:
-            features, labels = features.to(device), labels.to(device)  # Ensure data is on the correct device
+            features, labels = features.to(device), labels.to(device)
             optimizer.zero_grad()
-            outputs = domain_probe(features)
-            loss = criterion(outputs, labels)
+            outputs = action_probe(features)
+            loss = criterion(outputs, labels)  # No need to modify labels
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
 
         # Validation phase
-        domain_probe.eval()
+        action_probe.eval()
         val_loss = 0.0
         correct = 0
         total = 0
         with torch.no_grad():
             for features, labels in val_loader:
                 features, labels = features.to(device), labels.to(device)
-                outputs = domain_probe(features)
+                outputs = action_probe(features)
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
 
-                # Binary prediction
-                predicted = torch.round(torch.sigmoid(outputs))
-                correct += (predicted == labels).sum().item()
+                # Get predictions (argmax for the highest score)
+                predicted = torch.argmax(outputs, dim=1)
+                correct += (predicted == labels).sum().item()  # Direct comparison
                 total += labels.size(0)
 
         val_accuracy = correct / total
@@ -96,7 +84,3 @@ def train_domain_probe(file_path, epochs=30, batch_size=200, lr=0.001):
             f"Val Loss: {val_loss/len(val_loader):.4f} | "
             f"Val Accuracy: {val_accuracy * 100:.2f}%"
         )
-
-
-# Example usage:
-# train_domain_probe("path_to_your_npz_file.npz", epochs=30, batch_size=200, lr=0.001)
