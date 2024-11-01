@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from scipy.spatial.distance import euclidean, cosine
 
 def euclidean_distance(embeddings, dataset_flags):
