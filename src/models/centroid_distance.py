@@ -21,7 +21,7 @@ def std_dev(embeddings):
         embeddings[i] = embeddings[i] / np.std(embeddings[i], axis=0, ddof=1)
     return embeddings
 
-def euclidean_distance(embeddings, dataset_flags, distance_metric, normalization):
+def centroid_distance(embeddings, dataset_flags, distance_metric, normalization):
     
     #Normalize
     norm = 1
