@@ -17,12 +17,20 @@ def min_max(embeddings):
     return normalized_embeddings
 
 def std_dev(embeddings):
+    # std_devs = []
+    # for i in range (len(embeddings)):
+    #     std_devs.append(np.std(embeddings[i], axis=0, ddof=1))
+    # norm = np.mean(std_devs)
+    # embeddings /= norm
     for i in range(len(embeddings)):
         embeddings[i] = embeddings[i] / np.std(embeddings[i], axis=0, ddof=1)
     return embeddings
 
-def centroid_distance(embeddings, dataset_flags, distance_metric, normalization):
-    
+def centroid_distance(encoder, distance_metric, normalization):
+    file_path = "/home/ubuntu/semrep/embeddings/encoders/"+encoder+".npz"
+    dataset = np.load(file_path)
+    embeddings = dataset["embeddings"]
+    dataset_flags = dataset["dataset_flag"]
     #Normalize
     norm = 1
     if normalization == "std_dev":
