@@ -94,6 +94,7 @@ def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001):
     plt.plot(val_losses, label='Validation Loss')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
+    plt.yscale('log')
     plt.legend()
     plt.title('Training and Validation Loss over Epochs')
     plt.savefig(os.path.join(output_path, "train_val_loss.png"))
