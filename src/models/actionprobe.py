@@ -1,8 +1,10 @@
+from tqdm import tqdm 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import matplotlib.pyplot as plt
+import pandas as pd  # For rolling window calculations
 import os
 from src.models.loadsplit import load_and_use_existing_split
 
@@ -12,7 +14,6 @@ def debug_info(variable, name):
         f"{name} - Type: {type(variable)}, Dtype: {getattr(variable, 'dtype', 'N/A')}, Sample: {variable[:5]}"
     )
 
-# Define the Linear Probe model
 class LinearProbe(nn.Module):
     def __init__(self, input_dim, output_dim=1):
         super(LinearProbe, self).__init__()
@@ -21,8 +22,7 @@ class LinearProbe(nn.Module):
     def forward(self, x):
         return self.linear(x)
 
-def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001):
-    # Load train and validation data
+def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001, rolling_window=10):
     train_data, val_data = load_and_use_existing_split(file_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -47,12 +47,10 @@ def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001):
     criterion = nn.MSELoss()
     optimizer = optim.Adam(action_probe.parameters(), lr=lr)
 
-    # Initialize lists to store losses for plotting
     train_losses = []
     val_losses = []
 
-    # Training loop
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs), desc="Training Epochs"):
         action_probe.train()
         train_loss = 0.0
 
@@ -79,22 +77,41 @@ def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001):
         train_losses.append(avg_train_loss)
         val_losses.append(avg_val_loss)
 
-        print(
-            f"Epoch [{epoch+1}/{epochs}] | "
-            f"Train Loss: {avg_train_loss:.4f} "
-            f"Val Loss: {avg_val_loss:.4f}"
-        )
+        # if (epoch + 1) % 10 == 0:
+        #         os.system('cls' if os.name == 'nt' else 'clear')  # Clear console
+        #         print(f"Epoch {epoch + 1}/{epochs} - Train Loss: {avg_train_loss:.4f} - Val Loss: {avg_val_loss:.4f}")    
 
-    # Plot and save the train and validation loss curves
+    if len(train_losses) >= 100:
+        avg_last_100_train_loss = sum(train_losses[-100:]) / 100
+        tqdm.write(f"Average Training Loss (Last 100 Epochs): {avg_last_100_train_loss:.4f}")
+
+    # Downsample losses using a rolling window
+    train_losses_smooth = pd.Series(train_losses).rolling(window=rolling_window).mean()
+    val_losses_smooth = pd.Series(val_losses).rolling(window=rolling_window).mean()
+
     output_path = "/home/ubuntu/semrep/src/models"
     os.makedirs(output_path, exist_ok=True)
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(train_losses, label='Train Loss')
-    plt.plot(val_losses, label='Validation Loss')
+    plt.figure(figsize=(12, 8))
+
+    # Smoothed Training Loss
+    plt.subplot(2, 1, 1)
+    plt.plot(train_losses_smooth, label='Smoothed Train Loss', color='blue')
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.yscale('log')
     plt.legend()
-    plt.title('Training and Validation Loss over Epochs')
-    plt.savefig(os.path.join(output_path, "train_val_loss.png"))
+    plt.title(f'Smoothed Training Loss (Rolling Window: {rolling_window})')
+
+    # Smoothed Validation Loss
+    plt.subplot(2, 1, 2)
+    plt.plot(val_losses_smooth, label='Smoothed Validation Loss', color='orange')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.yscale('log')
+    plt.legend()
+    plt.title(f'Smoothed Validation Loss (Rolling Window: {rolling_window})')
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_path, "train_val_loss_separate_smoothed.png"))
+    tqdm.write(f"Plots saved to {os.path.join(output_path, 'train_val_loss_separate_smoothed.png')}")
