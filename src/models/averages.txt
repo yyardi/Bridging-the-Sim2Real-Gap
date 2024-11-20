@@ -2,3 +2,5 @@ dinov2: 0.3355
 MVP: 0.3046
 ResNet18: 0.3076
 ResNet34: 0.3089
+ResNet50: 0.3061
+VIP: 
