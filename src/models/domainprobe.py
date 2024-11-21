@@ -23,7 +23,7 @@ class LinearProbe(nn.Module):
         return self.linear(x)
 
 
-def train_domain_probe(file_path, epochs=30, batch_size=200, lr=0.001):
+def train_domain_probe(file_path, epochs=30, batch_size=1000, lr=0.001):
     # Load train and validation splits
     train_data, val_data = load_and_use_existing_split(file_path)
 
