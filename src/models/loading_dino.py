@@ -21,7 +21,7 @@ class DinoV2Encoder(torch.nn.Module):
 
         if freeze:
             for param in self.model.parameters():
-                param.requires_grad = False
+                param.requires_grad = True
 
             self.model.eval()
 

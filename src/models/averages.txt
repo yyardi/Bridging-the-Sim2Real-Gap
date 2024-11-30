@@ -1,6 +1,14 @@
 dinov2: 0.3355
 MVP: 0.3046
-ResNet18: 0.3076
-ResNet34: 0.3089
-ResNet50: 0.3061
+R3M18: 0.3076
+R3M34: 0.3089
+R3M50: 0.3061
 VIP: 0.3142
+EfficientNetB0: 0.3544
+MobileNetv3: 0.3522
+mcr: 0.3061
+ResNet18: 7.5836
+ResNet34: 7.1332
+ResNet50: 6.7427
+ResNet101: 9.6638
+
