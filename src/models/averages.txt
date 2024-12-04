@@ -11,4 +11,6 @@ ResNet18: 7.5836
 ResNet34: 7.1332
 ResNet50: 6.7427
 ResNet101: 9.6638
+ViT: 0.3584
+
 

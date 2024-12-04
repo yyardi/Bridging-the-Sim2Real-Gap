@@ -1,44 +1,97 @@
 from r3m import load_r3m
 import mvp
 from vip import load_vip
-from src.models.loading_dino import DinoV2Encoder
+import torch
+# from src.models.loading_dino import DinoV2Encoder
 import mcr
 import timm
+from transformers import AutoModelForImageClassification
+import clip
+
+def load_CLIP():
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model, preprocess = clip.load("ViT-B/32", device=device)
+    model.eval()
+    return model
+
+
+
+def load_hybridViT():
+    model = AutoModelForImageClassification.from_pretrained("google/vit-hybrid-base-bit-384")
+    model.eval()
+    return model
+
+def load_swin():
+    model = timm.create_model("swin_base_patch4_window7_224", pretrained=True)
+    model.eval()
+    return model
+
+
+def load_BEiT():
+    model = timm.create_model("beit_large_patch16_224", pretrained=True)
+    model.eval()
+    return model
+
+
+def load_CoAtNet():
+    model = timm.create_model("coatnet_1_224", pretrained=False)
+    model.eval()
+    return model
+
+
+def load_dinov2():
+    model = timm.create_model("vit_base_patch14_dinov2", pretrained=True)
+    model.eval()
+    return model
+
+
+def load_ViT():
+    model = timm.create_model("vit_base_patch16_224", pretrained=True)
+    model.eval()
+    return model
+
 
 def load_effnet():
     model = timm.create_model("efficientnet_b0", pretrained=True)
     model.eval()
     return model
 
+
 def load_mobilenet():
     model = timm.create_model("mobilenetv3_large_100", pretrained=True)
     model.eval()
     return model
+
 
 def load_vgg16():
     model = timm.create_model("vgg16", pretrained=True)
     model.eval()
     return model
 
+
 def load_vgg19():
     model = timm.create_model("vgg19", pretrained=True)
     model.eval()
     return model
+
 
 def load_resnet18():
     model = timm.create_model("resnet18", pretrained=True)
     model.eval()
     return model
 
+
 def load_resnet34():
     model = timm.create_model("resnet34", pretrained=True)
     model.eval()
     return model
 
+
 def load_resnet50():
     model = timm.create_model("resnet50", pretrained=True)
     model.eval()
     return model
+
 
 def load_resnet101():
     model = timm.create_model("resnet101", pretrained=True)
@@ -74,12 +127,13 @@ def load_mvp():
     # Load the encoder with pretrained weights
     mvpmodel = mvp.load("vitb-mae-egosoup")
     mvpmodel.freeze()
-
     return mvpmodel
+
 
 def load_mcr():
     mcrencoder = mcr.load_mcr(ckpt_path="/home/ubuntu/robots-pretrain-robots/mcr_resnet50.pth")
     return mcrencoder
+
 
 # Dictionary to store the models
 models = {
@@ -88,7 +142,8 @@ models = {
     "R3M34": load_R3M34,
     "R3M50": load_R3M50,
     "MVP": load_mvp,
-    "dinov2": lambda: DinoV2Encoder("dinov2_vits14"),
+    # "dinov2": lambda: DinoV2Encoder("dinov2_vits14"),
+    "dinov2": load_dinov2,
     "mcr": load_mcr,
     "ResNet18": load_resnet18,
     "ResNet34": load_resnet34,
@@ -98,5 +153,11 @@ models = {
     "MobileNetv3": load_mobilenet,
     "vgg16": load_vgg16,
     "vgg19": load_vgg19,
+    "ViT": load_ViT,
+    "Swin": load_swin,
+    "BEiT": load_BEiT,
+    "CoAtNet": load_CoAtNet,
+    "HybridViT": load_hybridViT,
+    "CLIP": load_CLIP,
 
 }

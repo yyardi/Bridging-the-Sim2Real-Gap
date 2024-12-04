@@ -16,6 +16,7 @@ resize_transform = transforms.Compose(
 )
 
 
+@torch.no_grad()
 def generate_embeddings(
     model,
     images,
@@ -33,18 +34,14 @@ def generate_embeddings(
         indices = np.random.choice(images.shape[0], size=num_samples, replace=False)
 
     # Embedding generation loop
-    with torch.no_grad():
+    for i in trange(0, num_samples, batch_size, desc="Processing"):
+        batch_indices = indices[i : i + batch_size]
+        batch = (
+            torch.stack([resize_transform(img) for img in images[batch_indices]]).float().cuda()
+        )
 
-        for i in trange(0, num_samples, batch_size, desc="Processing"):
-            batch_indices = indices[i : i + batch_size]
-            batch = (
-                torch.stack([resize_transform(img) for img in images[batch_indices]])
-                .float()
-                .cuda()
-            )
-
-            embeddings = model(batch).cpu()
-            embedding_batches.append(embeddings)
+        embeddings = model(batch).cpu()
+        embedding_batches.append(embeddings)
 
     # Concatenate all embeddings
     embeddings = torch.cat(embedding_batches)
