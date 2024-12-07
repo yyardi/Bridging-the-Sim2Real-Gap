@@ -270,10 +270,11 @@ class HybridViTEncoder(BaseEncoder):
         inputs = self.processor(images=image_pil, return_tensors="pt")
         return inputs.pixel_values.to(self.device)
 
+    @torch.no_grad()
     def __call__(self, x):
         x = self.process_batch(x)
-        with torch.no_grad():
-            return self.model(x)[0]  # Return last hidden states
+        h = self.model(x).pooler_output
+        return h
 
 
 class TorchvisionEncoder(BaseEncoder):
