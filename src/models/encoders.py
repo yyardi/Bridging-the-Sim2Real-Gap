@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from torchvision import transforms
 
 from r3m.models.models_r3m import R3M
+import torchvision
 
 
 class BaseEncoder(ABC):
@@ -57,6 +58,7 @@ class BaseEncoder(ABC):
         else:
             raise ValueError(f"Invalid input shape: {batch.shape}")
 
+    @torch.no_grad()
     def __call__(self, x):
         """
         Args:
@@ -66,8 +68,8 @@ class BaseEncoder(ABC):
             embeddings: torch tensor
         """
         x = self.process_batch(x)
-        with torch.no_grad():
-            return self.model(x)
+        h = self.model(x)
+        return h
 
 
 class TimmEncoder(BaseEncoder):
@@ -79,7 +81,7 @@ class TimmEncoder(BaseEncoder):
         self._setup_preprocessing()
 
     def _load_model(self):
-        self.model = timm.create_model(self.model_name, pretrained=self.pretrained)
+        self.model = timm.create_model(self.model_name, pretrained=self.pretrained, num_classes=0)
         self.model.eval()
         self.model.to(self.device)
 
@@ -128,6 +130,7 @@ class TransformerEncoder(BaseEncoder):
         else:
             raise ValueError(f"Invalid input shape: {batch.shape}")
 
+    @torch.no_grad()
     def __call__(self, x):
         """
         Args:
@@ -137,9 +140,9 @@ class TransformerEncoder(BaseEncoder):
             embeddings: torch tensor of shape (1, embedding_dim)
                        or (B, embedding_dim) for batches
         """
+
         x = self.process_batch(x)
-        with torch.no_grad():
-            return self.model(x)[0]  # Return last hidden states
+        return self.model(x)[0]  # Return last hidden states
 
 
 class R3MEncoder(BaseEncoder):
@@ -179,10 +182,11 @@ class R3MEncoder(BaseEncoder):
 class CLIPEncoder(BaseEncoder):
     """Wrapper for CLIP models to maintain consistent interface"""
 
-    def __init__(self, model, preprocess):
+    def __init__(self, model_name):
         super().__init__()
-        self.model = model
-        self.preprocess = preprocess
+        self.model, self.preprocess = clip.load(
+            model_name, device="cuda" if torch.cuda.is_available() else "cpu"
+        )
 
     def __call__(self, x):
         x = self.process_batch(x)
@@ -272,6 +276,27 @@ class HybridViTEncoder(BaseEncoder):
             return self.model(x)[0]  # Return last hidden states
 
 
+class TorchvisionEncoder(BaseEncoder):
+    """Wrapper for Torchvision models"""
+
+    def __init__(self, model_name):
+        super().__init__()
+        self.model = torchvision.models.resnet18(pretrained=True)
+        self.model.eval()
+        self.model.to(self.device)
+        self.preprocess = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+
+    def __call__(self, x):
+        x = self.process_batch(x)
+        with torch.no_grad():
+            return self.model(x)
+
+
 # Model configurations
 MODEL_CONFIGS = {
     # TIMM models
@@ -302,6 +327,8 @@ MODEL_CONFIGS = {
     "CLIP-Base-16": {"type": "clip", "name": "ViT-B/16"},
     "CLIP-Large-14": {"type": "clip", "name": "ViT-L/14"},
     "CLIP-Large-336": {"type": "clip", "name": "ViT-L/14@336px"},
+    # Torchvision models
+    # "ResNet18": {"type": "torchvision", "name": "resnet18"},
 }
 
 
@@ -314,12 +341,9 @@ def load_model(model_name):
     model_type = config["type"]
 
     if model_type == "timm":
-        model = timm.create_model(config["name"], pretrained=config.get("pretrained", True))
+        model = TimmEncoder(config["name"])
     elif model_type == "clip":
-        model, preprocess = clip.load(
-            config["name"], device="cuda" if torch.cuda.is_available() else "cpu"
-        )
-        model = CLIPEncoder(model, preprocess)
+        model = CLIPEncoder(config["name"])
     elif model_type == "hf":
         model = TransformerEncoder(config["name"])
     elif model_type == "hybridvit":
@@ -333,6 +357,8 @@ def load_model(model_name):
         model.freeze()
     elif model_type == "mcr":
         model = MCREncoder(config["path"])
+    elif model_type == "torchvision":
+        model = TorchvisionEncoder(config["name"])
 
     return model
 
