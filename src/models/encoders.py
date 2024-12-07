@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from torchvision import transforms
 
 from r3m.models.models_r3m import R3M
-import torchvision
+from vip import VIP
 
 
 class BaseEncoder(ABC):
@@ -203,18 +203,28 @@ class VIPEncoder(BaseEncoder):
         self._setup_preprocessing()
 
     def _load_model(self):
-        self.model = load_vip()
+        self.model: VIP = load_vip().module
         self.model.eval()
         self.model.to(self.device)
 
     def _setup_preprocessing(self):
         # VIP handles normalization internally, so we just need to convert to tensor
-        self.preprocess = transforms.Compose([transforms.ToTensor()])
+        vip_norm = self.model.normlayer
+        # This transform takes in a PIL image, resizes it to 244x244, converts it to a tensor,
+        # and then normalizes it using VIP's normalization parameters
+        self.preprocess = transforms.Compose(
+            [
+                transforms.Resize((244, 244)),
+                transforms.ToTensor(),
+                vip_norm,
+            ]
+        )
 
+    @torch.no_grad()
     def __call__(self, x):
         x = self.process_batch(x)
-        with torch.no_grad():
-            return self.model(x * 255.0)  # VIP expects [0-255] range
+        h = self.model.convnet(x)
+        return h
 
 
 class MCREncoder(BaseEncoder):
@@ -232,6 +242,7 @@ class MCREncoder(BaseEncoder):
         self.model.to(self.device)
 
     def _setup_preprocessing(self):
+        assert False, "TODO: Implement preprocessing for MCR"
         # MCR expects input in [0-255] range and handles normalization internally
         self.preprocess = transforms.Compose([transforms.ToTensor()])
 
@@ -277,27 +288,6 @@ class HybridViTEncoder(BaseEncoder):
         return h
 
 
-class TorchvisionEncoder(BaseEncoder):
-    """Wrapper for Torchvision models"""
-
-    def __init__(self, model_name):
-        super().__init__()
-        self.model = torchvision.models.resnet18(pretrained=True)
-        self.model.eval()
-        self.model.to(self.device)
-        self.preprocess = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            ]
-        )
-
-    def __call__(self, x):
-        x = self.process_batch(x)
-        with torch.no_grad():
-            return self.model(x)
-
-
 # Model configurations
 MODEL_CONFIGS = {
     # TIMM models
@@ -321,15 +311,16 @@ MODEL_CONFIGS = {
     "R3M18": {"type": "r3m", "name": "resnet18"},
     "R3M34": {"type": "r3m", "name": "resnet34"},
     "R3M50": {"type": "r3m", "name": "resnet50"},
-    "MVP": {"type": "mvp", "name": "vitb-mae-egosoup"},
-    "mcr": {"type": "mcr", "path": "/home/ubuntu/robots-pretrain-robots/mcr_resnet50.pth"},
+    # "MVP": {"type": "mvp", "name": "vitb-mae-egosoup"},
+    "MCR": {"type": "mcr", "path": "models/mcr/mcr_resnet50.pth"},
+    # TODO: Add VC-1 model and HRP model
+    "VC-1": {"type": "vc1", "path": "models/vc1/vc1_resnet50.pth"},
+    "HRP": {"type": "hrp", "path": "models/hrp/hrp_resnet50.pth"},
     # CLIP models
     "CLIP-Base-32": {"type": "clip", "name": "ViT-B/32"},
     "CLIP-Base-16": {"type": "clip", "name": "ViT-B/16"},
     "CLIP-Large-14": {"type": "clip", "name": "ViT-L/14"},
     "CLIP-Large-336": {"type": "clip", "name": "ViT-L/14@336px"},
-    # Torchvision models
-    # "ResNet18": {"type": "torchvision", "name": "resnet18"},
 }
 
 
