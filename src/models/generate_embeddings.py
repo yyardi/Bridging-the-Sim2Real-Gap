@@ -2,7 +2,9 @@ import torch
 import numpy as np
 from tqdm import trange
 import torchvision.transforms as transforms
-import os
+
+from src.models.encoders import BaseEncoder
+from typing import Optional
 
 resize_transform = transforms.Compose(
     [
@@ -18,10 +20,10 @@ resize_transform = transforms.Compose(
 
 @torch.no_grad()
 def generate_embeddings(
-    model,
-    images,
-    num_samples=None,  # None for all
-    batch_size=200,
+    model: BaseEncoder,
+    images: np.ndarray,
+    num_samples: Optional[int] = None,  # None for all
+    batch_size: int = 256,
 ):
 
     # List to store embeddings for each group
@@ -36,9 +38,11 @@ def generate_embeddings(
     # Embedding generation loop
     for i in trange(0, num_samples, batch_size, desc="Processing"):
         batch_indices = indices[i : i + batch_size]
-        batch = (
-            torch.stack([resize_transform(img) for img in images[batch_indices]]).float().cuda()
-        )
+
+        # The image processing is handled by the encoder
+        batch = images[batch_indices]
+
+        print(batch.shape)
 
         embeddings = model(batch).cpu()
         embedding_batches.append(embeddings)

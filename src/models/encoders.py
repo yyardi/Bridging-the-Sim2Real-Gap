@@ -8,10 +8,9 @@ import torch
 import mcr
 import timm
 from transformers import (
-    AutoModelForImageClassification,
     AutoImageProcessor,
     AutoModel,
-    HybridViTModel,
+    ViTHybridModel,
 )
 import clip
 import numpy as np
@@ -19,7 +18,7 @@ from PIL import Image
 from abc import ABC, abstractmethod
 from torchvision import transforms
 
-from r3m import R3MEncoder
+from r3m.models.models_r3m import R3M
 
 
 class BaseEncoder(ABC):
@@ -54,7 +53,7 @@ class BaseEncoder(ABC):
             return self.preprocess_numpy(batch)
         elif len(batch.shape) == 4:
             # Batch of images
-            return torch.stack([self.preprocess_numpy(img) for img in batch])
+            return torch.cat([self.preprocess_numpy(img) for img in batch], dim=0)
         else:
             raise ValueError(f"Invalid input shape: {batch.shape}")
 
@@ -153,18 +152,28 @@ class R3MEncoder(BaseEncoder):
         self._setup_preprocessing()
 
     def _load_model(self):
-        self.model = load_r3m(self.model_name)
+        self.model: R3M = load_r3m(self.model_name).module
         self.model.eval()
         self.model.to(self.device)
 
     def _setup_preprocessing(self):
         # R3M handles normalization internally, so we just need to convert to tensor
-        self.preprocess = transforms.Compose([transforms.ToTensor()])
+        r3m_norm = self.model.normlayer
+        # This transform takes in a PIL image, resizes it to 244x244, converts it to a tensor,
+        # and then normalizes it using R3M's normalization parameters
+        self.preprocess = transforms.Compose(
+            [
+                transforms.Resize((244, 244)),
+                transforms.ToTensor(),
+                r3m_norm,
+            ]
+        )
 
+    @torch.no_grad()
     def __call__(self, x):
         x = self.process_batch(x)
-        with torch.no_grad():
-            return self.model(x * 255.0)  # R3M expects [0-255] range
+        h = self.model.convnet(x)
+        return h
 
 
 class CLIPEncoder(BaseEncoder):
@@ -239,7 +248,7 @@ class HybridViTEncoder(BaseEncoder):
         self._setup_preprocessing()
 
     def _load_model(self):
-        self.model = HybridViTModel.from_pretrained(self.model_name)
+        self.model = ViTHybridModel.from_pretrained(self.model_name)
         self.model.eval()
         self.model.to(self.device)
 
@@ -318,14 +327,13 @@ def load_model(model_name):
     elif model_type == "vip":
         model = VIPEncoder()
     elif model_type == "r3m":
-        model = R3MEncoder()
+        model = R3MEncoder(config["name"])
     elif model_type == "mvp":
         model = mvp.load(config["name"])
         model.freeze()
     elif model_type == "mcr":
         model = MCREncoder(config["path"])
 
-    model.eval()
     return model
 
 
