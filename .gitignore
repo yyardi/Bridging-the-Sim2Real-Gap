@@ -172,3 +172,15 @@ cython_debug/
 #.idea/
 
 embeddings/
+
+# IDE
+.vscode/
+
+# External model repositories
+CLIP/
+data4robotics/
+eai-vc/
+models/mcr/
+r3m/
+robots-pretrain-robots/
+vip/
