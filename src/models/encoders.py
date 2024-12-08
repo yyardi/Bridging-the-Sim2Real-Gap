@@ -183,7 +183,6 @@ class TransformerEncoder(BaseEncoder):
         else:
             raise ValueError(f"Invalid input shape: {batch.shape}")
 
-    @torch.no_grad()
     def __call__(self, x):
         """
         Args:
@@ -193,9 +192,15 @@ class TransformerEncoder(BaseEncoder):
             embeddings: torch tensor of shape (1, embedding_dim)
                        or (B, embedding_dim) for batches
         """
-
-        x = self.process_batch(x)
+        if not isinstance(x, torch.Tensor):
+            x = self.process_batch(x)
         return self.model(x)[0]  # Return last hidden states
+
+    def get_gradcam_target_layers(self):
+        return [self.model.encoder.layer[-1].norm1]
+
+    def get_gradcam_transform(self):
+        return reshape_transform_ViT
 
 
 class R3MEncoder(BaseEncoder):
@@ -204,11 +209,12 @@ class R3MEncoder(BaseEncoder):
     def __init__(self, model_name):
         super().__init__()
         self.model_name = f"R3M-{model_name}"
+        self.backbone = model_name
         self._load_model()
         self._setup_preprocessing()
 
     def _load_model(self):
-        self.model: R3M = load_r3m(self.model_name).module
+        self.model: R3M = load_r3m(self.backbone).module
         self.model.eval()
         self.model.to(self.device)
 
@@ -342,6 +348,8 @@ class VC1Encoder(BaseEncoder):
     def _load_model(self):
 
         self.model, *_ = model_utils.load_model(self.model_name)
+        self.model.eval()
+        self.model.to(self.device)
 
     def _setup_preprocessing(self):
         self.preprocess = transforms.Compose(
@@ -425,8 +433,10 @@ MODEL_CONFIGS = {
     "ViT": {"type": "timm", "name": "vit_base_patch16_224"},
     "Swin": {"type": "timm", "name": "swin_base_patch4_window7_224"},
     "BEiT": {"type": "timm", "name": "beit_large_patch16_224"},
-    "CoAtNet": {"type": "timm", "name": "coatnet_3_rw_224.sw_in12k"},
-    "dinov2": {"type": "timm", "name": "vit_base_patch16_224.dino"},
+    "DinoV2": {"type": "timm", "name": "vit_base_patch14_dinov2"},
+    # "CoAtNet": {"type": "timm", "name": "coatnet_3_rw_224"},
+    # HuggingFace models
+    # "DinoV2-B": {"type": "hf", "name": "facebook/dinov2-base"},
     # Robot learning models
     "VIP": {"type": "vip"},
     "R3M18": {"type": "r3m", "name": "resnet18"},

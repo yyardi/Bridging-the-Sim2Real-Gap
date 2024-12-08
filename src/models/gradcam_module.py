@@ -18,8 +18,10 @@ def prepare_image(img_array, size=224, device="cuda"):
     return img_tensor.to(device)
 
 
-def reshape_transform_ViT(tensor, height=14, width=14):
-    result = tensor[:, 1:, :].reshape(tensor.size(0), height, width, tensor.size(2))
+def reshape_transform_ViT(tensor):
+    result = tensor[:, 1:, :]
+    height = width = int(math.isqrt(result.shape[1]))
+    result = result.reshape(tensor.size(0), height, width, tensor.size(2))
 
     # Bring the channels to the first dimension,
     # like in CNNs.
@@ -36,7 +38,7 @@ def reshape_transform_swin(tensor, height=7, width=7):
     return result
 
 
-def reshape_transform_clip(tensor, height=7, width=7):
+def reshape_transform_clip(tensor):
     result = tensor[1:, :, :]
 
     height = width = int(math.isqrt(result.shape[0]))
