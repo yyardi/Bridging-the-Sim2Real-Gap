@@ -42,8 +42,6 @@ def generate_embeddings(
         # The image processing is handled by the encoder
         batch = images[batch_indices]
 
-        print(batch.shape)
-
         embeddings = model(batch).cpu()
         embedding_batches.append(embeddings)
 
