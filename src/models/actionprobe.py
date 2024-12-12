@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-import matplotlib.pyplot as plt
 import pandas as pd  # For rolling window calculations
 import os
 from src.models.loadsplit import load_and_use_existing_split
@@ -22,7 +21,7 @@ class LinearProbe(nn.Module):
     def forward(self, x):
         return self.linear(x)
 
-def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001, rolling_window=10):
+def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001, rolling_window=10, model_name="Model"):
     train_data, val_data = load_and_use_existing_split(file_path)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -77,41 +76,13 @@ def train_action_probe(file_path, epochs=30, batch_size=200, lr=0.001, rolling_w
         train_losses.append(avg_train_loss)
         val_losses.append(avg_val_loss)
 
-        # if (epoch + 1) % 10 == 0:
-        #         os.system('cls' if os.name == 'nt' else 'clear')  # Clear console
-        #         print(f"Epoch {epoch + 1}/{epochs} - Train Loss: {avg_train_loss:.4f} - Val Loss: {avg_val_loss:.4f}")    
+    if epochs >= 10000:
+        if len(train_losses) >= 100:
+            avg_last_100_train_loss = sum(train_losses[-100:]) / 100
+            tqdm.write(f"Average Training Loss (Last 100 Epochs) for {model_name}: {avg_last_100_train_loss:.4f}")
 
-    if len(train_losses) >= 100:
-        avg_last_100_train_loss = sum(train_losses[-100:]) / 100
-        tqdm.write(f"Average Training Loss (Last 100 Epochs): {avg_last_100_train_loss:.4f}")
+            averages_path = "/home/ubuntu/semrep/src/models/averages.txt"
+            with open(averages_path, "a") as f:
+                f.write(f"{model_name}: {avg_last_100_train_loss:.4f}\n")
 
-    # Downsample losses using a rolling window
-    train_losses_smooth = pd.Series(train_losses).rolling(window=rolling_window).mean()
-    val_losses_smooth = pd.Series(val_losses).rolling(window=rolling_window).mean()
-
-    output_path = "/home/ubuntu/semrep/src/models"
-    os.makedirs(output_path, exist_ok=True)
-
-    plt.figure(figsize=(12, 8))
-
-    # Smoothed Training Loss
-    plt.subplot(2, 1, 1)
-    plt.plot(train_losses_smooth, label='Smoothed Train Loss', color='blue')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.yscale('log')
-    plt.legend()
-    plt.title(f'Smoothed Training Loss (Rolling Window: {rolling_window})')
-
-    # Smoothed Validation Loss
-    plt.subplot(2, 1, 2)
-    plt.plot(val_losses_smooth, label='Smoothed Validation Loss', color='orange')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.yscale('log')
-    plt.legend()
-    plt.title(f'Smoothed Validation Loss (Rolling Window: {rolling_window})')
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_path, "train_val_loss_separate_smoothed.png"))
-    tqdm.write(f"Plots saved to {os.path.join(output_path, 'train_val_loss_separate_smoothed.png')}")
+    return train_losses, val_losses
