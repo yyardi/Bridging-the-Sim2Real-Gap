@@ -42,7 +42,7 @@ def generate_embeddings(
         # The image processing is handled by the encoder
         batch = images[batch_indices]
 
-        embeddings = model(batch).cpu()
+        embeddings = model(batch).cpu().to(torch.float32)
         embedding_batches.append(embeddings)
 
     # Concatenate all embeddings

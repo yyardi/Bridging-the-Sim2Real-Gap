@@ -1,8 +1,8 @@
 from pathlib import Path
 from mcr.models.models_mcr import MCR
 from r3m import load_r3m
-
-# import mvp
+from timm.data.constants import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
+import mvp
 from vip import load_vip
 import torch
 
@@ -31,6 +31,8 @@ from src.models.gradcam_module import (
 from vc_models.models.vit import model_utils
 
 from data4robotics import load_vit, load_resnet18
+
+from torch import nn
 
 
 class BaseEncoder(ABC, torch.nn.Module):
@@ -220,11 +222,11 @@ class R3MEncoder(BaseEncoder):
 
     def _setup_preprocessing(self):
         r3m_norm = self.model.normlayer
-        # This transform takes in a PIL image, resizes it to 244x244, converts it to a tensor,
+        # This transform takes in a PIL image, resizes it to 224x224, converts it to a tensor,
         # and then normalizes it using R3M's normalization parameters
         self.preprocess = transforms.Compose(
             [
-                transforms.Resize((244, 244)),
+                transforms.Resize((224, 224)),
                 transforms.ToTensor(),
                 r3m_norm,
             ]
@@ -238,6 +240,41 @@ class R3MEncoder(BaseEncoder):
 
     def get_gradcam_target_layers(self):
         return [self.model.convnet.layer4[-1]]
+
+
+class MVPEncoder(BaseEncoder):
+    """Wrapper for MVP models to maintain consistent interface"""
+
+    def __init__(self, model_name):
+        super().__init__()
+        self.model_name = f"MVP-{model_name}"
+        self.backbone = model_name
+        self._load_model()
+        self._setup_preprocessing()
+
+    def _load_model(self):
+        self.model: timm.models.vision_transformer.VisionTransformer = mvp.load(self.backbone)
+
+        self.model.eval()
+        self.model.to(self.device)
+
+    def _setup_preprocessing(self):
+        self.preprocess = transforms.Compose(
+            [
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=IMAGENET_DEFAULT_MEAN, std=IMAGENET_DEFAULT_STD),
+            ]
+        )
+
+    def __call__(self, x):
+        if not isinstance(x, torch.Tensor):
+            x = self.process_batch(x)
+        h = self.model(x)
+        return h
+
+    def get_gradcam_target_layers(self):
+        return [self.model.blocks[-1].norm1]
 
 
 class CLIPEncoder(BaseEncoder):
@@ -280,11 +317,11 @@ class VIPEncoder(BaseEncoder):
 
     def _setup_preprocessing(self):
         vip_norm = self.model.normlayer
-        # This transform takes in a PIL image, resizes it to 244x244, converts it to a tensor,
+        # This transform takes in a PIL image, resizes it to 224x224, converts it to a tensor,
         # and then normalizes it using VIP's normalization parameters
         self.preprocess = transforms.Compose(
             [
-                transforms.Resize((244, 244)),
+                transforms.Resize((224, 224)),
                 transforms.ToTensor(),
                 vip_norm,
             ]
@@ -316,11 +353,11 @@ class MCREncoder(BaseEncoder):
         self.model.to(self.device)
 
     def _setup_preprocessing(self):
-        # This transform takes in a PIL image, resizes it to 244x244, converts it to a tensor,
+        # This transform takes in a PIL image, resizes it to 224x224, converts it to a tensor,
         # and then normalizes it using mcr's normalization parameters
         self.preprocess = transforms.Compose(
             [
-                transforms.Resize((244, 244)),
+                transforms.Resize((224, 224)),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
@@ -419,6 +456,42 @@ class HRPEncoder(BaseEncoder):
         return h
 
 
+class DinoV2Encoder(BaseEncoder):
+    """Wrapper for DinoV2 models to maintain consistent interface"""
+
+    def __init__(self, model_name):
+        super().__init__()
+        self.model_name = model_name
+        self._load_model()
+        self._setup_preprocessing()
+
+    def _load_model(self):
+        self.model: nn.Module = torch.hub.load("facebookresearch/dinov2", self.model_name)
+        self.model.eval()
+        self.model.to(self.device)
+
+    def _setup_preprocessing(self):
+        self.preprocess = transforms.Compose(
+            [
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=IMAGENET_DEFAULT_MEAN, std=IMAGENET_DEFAULT_STD),
+            ]
+        )
+
+    def __call__(self, x):
+        if not isinstance(x, torch.Tensor):
+            x = self.process_batch(x)
+        h = self.model(x)
+        return h
+
+    def get_gradcam_target_layers(self):
+        return [self.model.blocks[-1].norm1]
+
+    def get_gradcam_transform(self):
+        return reshape_transform_ViT
+
+
 # Model configurations
 MODEL_CONFIGS = {
     # TIMM models
@@ -432,27 +505,27 @@ MODEL_CONFIGS = {
     "vgg19": {"type": "timm", "name": "vgg19"},
     "ViT": {"type": "timm", "name": "vit_base_patch16_224"},
     "Swin": {"type": "timm", "name": "swin_base_patch4_window7_224"},
-    "BEiT": {"type": "timm", "name": "beit_large_patch16_224"},
-    "DinoV2": {"type": "timm", "name": "vit_base_patch14_dinov2"},
+    # "DinoV2": {"type": "timm", "name": "vit_base_patch14_dinov2"},
     # "CoAtNet": {"type": "timm", "name": "coatnet_3_rw_224"},
     # HuggingFace models
-    # "DinoV2-B": {"type": "hf", "name": "facebook/dinov2-base"},
     # Robot learning models
     "VIP": {"type": "vip"},
     "R3M18": {"type": "r3m", "name": "resnet18"},
     "R3M34": {"type": "r3m", "name": "resnet34"},
     "R3M50": {"type": "r3m", "name": "resnet50"},
-    # "MVP": {"type": "mvp", "name": "vitb-mae-egosoup"},
     "MCR": {"type": "mcr", "name": "mcr"},
     "VC1-B": {"type": "vc1", "name": "vc1_vitb"},
-    "VC1-L": {"type": "vc1", "name": "vc1_vitl"},
-    # TODO: Add VC-1 model and HRP model
     "HRP-ResNet18": {"type": "hrp", "name": "resnet18"},
     "HRP-ViT": {"type": "hrp", "name": "vit"},
     # CLIP models
     "CLIP-Base-16": {"type": "clip", "name": "ViT-B/16"},
     "CLIP-Base-32": {"type": "clip", "name": "ViT-B/32"},
     "CLIP-Large-14": {"type": "clip", "name": "ViT-L/14"},
+    # "BEiT": {"type": "timm", "name": "beit_large_patch16_224"},
+    # "DinoV2-B": {"type": "hf", "name": "facebook/dinov2-base"},
+    "MVP": {"type": "mvp", "name": "vitb-mae-egosoup"},
+    "VC1-L": {"type": "vc1", "name": "vc1_vitl"},
+    "DinoV2-B": {"type": "dinov2", "name": "dinov2_vitb14"},
 }
 
 
@@ -475,15 +548,16 @@ def load_model(model_name):
     elif model_type == "r3m":
         model = R3MEncoder(config["name"])
     elif model_type == "mvp":
-        raise NotImplementedError("MVP models are not supported as the weights are not available")
-        model = mvp.load(config["name"])
-        model.freeze()
+        # raise NotImplementedError("MVP models are not supported as the weights are not available")
+        model = MVPEncoder(config["name"])
     elif model_type == "mcr":
         model = MCREncoder(config["name"])
     elif model_type == "vc1":
         model = VC1Encoder(config["name"])
     elif model_type == "hrp":
         model = HRPEncoder(config["name"])
+    elif model_type == "dinov2":
+        model = DinoV2Encoder(config["name"])
 
     return model
 
