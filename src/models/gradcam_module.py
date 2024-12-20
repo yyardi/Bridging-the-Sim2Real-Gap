@@ -49,3 +49,4 @@ def reshape_transform_clip(tensor):
     # like in CNNs.
     result = result.permute(0, 3, 1, 2)
     return result
+

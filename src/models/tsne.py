@@ -17,16 +17,4 @@ def plot_tsne(embeddings, domain_labels, num_samples=1000):
     sim_embeddings_2d = embeddings_2d[sim_mask]
     real_embeddings_2d = embeddings_2d[real_mask]
 
-    # Plot the 2D embeddings
-    plt.figure(figsize=(12, 8))
-    plt.scatter(
-        sim_embeddings_2d[:, 0], sim_embeddings_2d[:, 1], c="orange", label="Sim", alpha=0.7
-    )
-    plt.scatter(
-        real_embeddings_2d[:, 0], real_embeddings_2d[:, 1], c="blue", label="Real", alpha=0.7
-    )
-    plt.xlabel("t-SNE Dimension 1")
-    plt.ylabel("t-SNE Dimension 2")
-    plt.legend()
-    plt.title("t-SNE visualization of sim vs real embeddings")
-    plt.show()
+    return sim_embeddings_2d, real_embeddings_2d

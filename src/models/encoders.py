@@ -524,7 +524,7 @@ MODEL_CONFIGS = {
     # "BEiT": {"type": "timm", "name": "beit_large_patch16_224"},
     # "DinoV2-B": {"type": "hf", "name": "facebook/dinov2-base"},
     "MVP": {"type": "mvp", "name": "vitb-mae-egosoup"},
-    "VC1-L": {"type": "vc1", "name": "vc1_vitl"},
+    # "VC1-L": {"type": "vc1", "name": "vc1_vitl"},
     "DinoV2-B": {"type": "dinov2", "name": "dinov2_vitb14"},
 }
 
