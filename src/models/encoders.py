@@ -275,6 +275,9 @@ class MVPEncoder(BaseEncoder):
 
     def get_gradcam_target_layers(self):
         return [self.model.blocks[-1].norm1]
+    
+    def get_gradcam_transform(self):
+        return reshape_transform_ViT
 
 
 class CLIPEncoder(BaseEncoder):
